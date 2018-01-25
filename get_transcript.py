@@ -10,7 +10,7 @@ import os
 import urlparse
 import subprocess
 
-
+'''
 # Set up argument parsing.
 parser = argparse.ArgumentParser(description='Retrieve plain text transcripts from YouTube videos.')
 parser.add_argument('youtube_url', metavar='url', help='The URL to the YouTube video you want to'
@@ -25,7 +25,7 @@ parser.add_argument('--reducenewlines', help='Remove all newlines except those i
 parser.add_argument('--printfilepath', help='Prints the outfile file path on console.', action='store_true')
 
 args = parser.parse_args()
-
+'''
 # Detect the current platform for platform-specific code later on.
 if sys.platform.startswith('darwin'):
     platform = 'mac'
@@ -39,13 +39,14 @@ else:
 
 class VidProperties:
     """Get and store video attributes (ID & Title)."""
-    def __init__(self):
+    def __init__(self,youtube_url):
         self.id = None
         self.title = None
         self.transcript = None
         self.filename = None
+        self.youtube_url
         try:
-            self.id = parse_url(args.youtube_url)
+            self.id = parse_url(self.youtube_url)
         except ValueError:
             print 'ERROR: You do not appear to have entered a valid YouTube address.'
             sys.exit(1)
@@ -175,49 +176,49 @@ def create_filename(title):
 
 
 # EXECUTION START HERE.
+def run():
+    # Collect the video, ID, transcript and title.
+    vidinfo = VidProperties()
+    raw_transcript = get_transcript()
+    vidinfo.transcript = format_transcript(raw_transcript)
 
-# Collect the video, ID, transcript and title.
-vidinfo = VidProperties()
-raw_transcript = get_transcript()
-vidinfo.transcript = format_transcript(raw_transcript)
+    # Validate output path.
+    outfile = os.path.expanduser(args.file)
 
-# Validate output path.
-outfile = os.path.expanduser(args.file)
+    # If user has not specified a filename, use the video title.
+    if os.path.isdir(outfile):
+        outfile = os.path.join(outfile, vidinfo.filename + '.txt')
 
-# If user has not specified a filename, use the video title.
-if os.path.isdir(outfile):
-    outfile = os.path.join(outfile, vidinfo.filename + '.txt')
+        # Check if output file already exists.
+    if not args.overwrite:
+        if os.path.isfile(outfile):
+            print 'ERROR: A file already exists in the same place with the same name.\n' \
+            'Please specify a different name or location.'
+            sys.exit(1)
 
-# Check if output file already exists.
-if not args.overwrite:
-    if os.path.isfile(outfile):
-        print 'ERROR: A file already exists in the same place with the same name.\n' \
-              'Please specify a different name or location.'
-        sys.exit(1)
+    # Write transcript to file.
+    try:
+        with open(outfile, 'w') as output_file:
+            output_file.write('Title: ' + vidinfo.title + '\n\n')
+            output_file.write(vidinfo.transcript)
+    except IOError as errtext:
+        if 'No such file or directory' in str(errtext):
+            print "ERROR: The destination folder you've specified does not exist. Please check the path and try again."
+            sys.exit(1)
+        else:
+            raise errtext
 
-# Write transcript to file.
-try:
-    with open(outfile, 'w') as output_file:
-        output_file.write('Title: ' + vidinfo.title + '\n\n')
-        output_file.write(vidinfo.transcript)
-except IOError as errtext:
-    if 'No such file or directory' in str(errtext):
-        print "ERROR: The destination folder you've specified does not exist. Please check the path and try again."
-        sys.exit(1)
-    else:
-        raise errtext
+        # Print filename to console.
+        if args.printfilepath:
+            print outfile
 
-# Print filename to console.
-if args.printfilepath:
-    print outfile
-
-# Open created file.
-if args.open:
-    if platform == 'mac':
-        subprocess.call(['open', outfile])
-    elif platform == 'windows':
-        os.startfile(outfile)
-    elif platform == 'linux':
-        subprocess.call(('xdg-open', outfile))
-    else:
-        print 'WARNING: Cannot detect your operating system. Unable to open the transcript file automatically.'
+        # Open created file.
+        if args.open:
+            if platform == 'mac':
+                subprocess.call(['open', outfile])
+            elif platform == 'windows':
+                os.startfile(outfile)
+            elif platform == 'linux':
+                subprocess.call(('xdg-open', outfile))
+            else:
+                print 'WARNING: Cannot detect your operating system. Unable to open the transcript file automatically.'
